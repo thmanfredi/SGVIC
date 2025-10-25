@@ -1,0 +1,5 @@
+# Ignorar credenciales y archivos de compilación
+db.properties
+/build/
+/dist/
+/nbproject/private/
