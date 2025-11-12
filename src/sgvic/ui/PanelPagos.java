@@ -1,85 +1,249 @@
 package sgvic.ui;
 
+import sgvic.entidades.Pago;
 import sgvic.excepciones.DataAccessException;
 import sgvic.excepciones.DomainException;
 import sgvic.excepciones.NotFoundException;
 import sgvic.servicios.PagoService;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.List;
 
 /**
- * Panel de Pagos (Swing).
- * Toma datos desde la UI y llama a PagoService.registrarPago.
+ * Panel de gestión de pagos.
+ *
+ * Permite:
+ *  - Registrar un pago para una obligación (ID obligación, fecha, medio, monto).
+ *  - Listar los pagos de una obligación dada.
  */
 public class PanelPagos extends JPanel {
 
-    private final PagoService service = new PagoService();
+    private final PagoService pagoService = new PagoService();
 
-    private final JTextField txtIdObl = new JTextField();
-    private final JTextField txtFecha = new JTextField(); // AAAA-MM-DD (opcional)
-    private final JTextField txtMonto = new JTextField();
-    private final JTextField txtMedio = new JTextField();
+    private JTextField txtIdObligacion;
+    private JTextField txtFecha;
+    private JTextField txtMonto;
+    private JComboBox<String> cmbMedio;
+    private JTable tablaPagos;
+    private JButton btnRegistrar;
+    private JButton btnVerPagos;
+
+    // Arreglo de medios de pago (cumple con el uso de arreglos + ArrayList)
+    private static final String[] MEDIOS_PAGO = {
+            "Transferencia",
+            "Efectivo",
+            "Tarjeta",
+            "Cheque"
+    };
+
+    private final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     public PanelPagos() {
-        setLayout(new BorderLayout());
-        JLabel lblTitulo = new JLabel("Registro de Pagos", JLabel.CENTER);
-        lblTitulo.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        initComponents();
+    }
 
-        JPanel form = new JPanel(new GridLayout(5, 2, 8, 8));
-        form.add(new JLabel("ID Obligación:"));
-        form.add(txtIdObl);
+    private void initComponents() {
+        setLayout(new BorderLayout(5, 5));
 
-        form.add(new JLabel("Fecha (AAAA-MM-DD) [vacío=hoy]:"));
-        form.add(txtFecha);
+        // --- Panel superior con formulario ---
+        JPanel panelForm = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(3, 3, 3, 3);
+        gbc.anchor = GridBagConstraints.WEST;
 
-        form.add(new JLabel("Monto:"));
-        form.add(txtMonto);
+        JLabel lblIdObl = new JLabel("ID Obligación:");
+        JLabel lblFecha = new JLabel("Fecha pago (dd/MM/aaaa):");
+        JLabel lblMedio = new JLabel("Medio de pago:");
+        JLabel lblMonto = new JLabel("Monto:");
 
-        form.add(new JLabel("Medio:"));
-        form.add(txtMedio);
+        txtIdObligacion = new JTextField(8);
+        txtFecha = new JTextField(10);
+        txtMonto = new JTextField(10);
+        cmbMedio = new JComboBox<>(MEDIOS_PAGO);
 
-        JButton btnRegistrar = new JButton("Registrar Pago");
-        form.add(new JLabel()); // filler
-        form.add(btnRegistrar);
+        btnRegistrar = new JButton("Registrar pago");
+        btnVerPagos = new JButton("Ver pagos de la obligación");
 
-        add(lblTitulo, BorderLayout.NORTH);
-        add(form, BorderLayout.CENTER);
+        int fila = 0;
 
-        // Acción: Registrar pago
-        btnRegistrar.addActionListener(e -> {
-            try {
-                int idObl = Integer.parseInt(txtIdObl.getText().trim());
-                LocalDate fecha = txtFecha.getText().trim().isBlank()
-                        ? LocalDate.now()
-                        : LocalDate.parse(txtFecha.getText().trim());
-                BigDecimal monto = new BigDecimal(txtMonto.getText().trim().replace(",", "."));
-                String medio = txtMedio.getText().trim();
+        gbc.gridx = 0; gbc.gridy = fila;
+        panelForm.add(lblIdObl, gbc);
+        gbc.gridx = 1;
+        panelForm.add(txtIdObligacion, gbc);
 
-                service.registrarPago(idObl, fecha, medio, monto);
+        fila++;
+        gbc.gridx = 0; gbc.gridy = fila;
+        panelForm.add(lblFecha, gbc);
+        gbc.gridx = 1;
+        panelForm.add(txtFecha, gbc);
 
-                JOptionPane.showMessageDialog(this, "Pago registrado y obligación marcada como PAGADA.",
-                        "OK", JOptionPane.INFORMATION_MESSAGE);
+        fila++;
+        gbc.gridx = 0; gbc.gridy = fila;
+        panelForm.add(lblMedio, gbc);
+        gbc.gridx = 1;
+        panelForm.add(cmbMedio, gbc);
 
-                // Limpio campos
-                txtIdObl.setText("");
-                txtFecha.setText("");
-                txtMonto.setText("");
-                txtMedio.setText("");
+        fila++;
+        gbc.gridx = 0; gbc.gridy = fila;
+        panelForm.add(lblMonto, gbc);
+        gbc.gridx = 1;
+        panelForm.add(txtMonto, gbc);
 
-            } catch (NumberFormatException nfe) {
-                JOptionPane.showMessageDialog(this, "ID de obligación o monto inválido.",
-                        "Validación", JOptionPane.WARNING_MESSAGE);
-            } catch (DomainException | DataAccessException | NotFoundException ex) {
-                JOptionPane.showMessageDialog(this, ex.getMessage(),
-                        "Error", JOptionPane.ERROR_MESSAGE);
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error inesperado: " + ex.getMessage(),
-                        "Error", JOptionPane.ERROR_MESSAGE);
+        fila++;
+        gbc.gridx = 0; gbc.gridy = fila; gbc.gridwidth = 2;
+        gbc.anchor = GridBagConstraints.CENTER;
+        JPanel panelBotones = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        panelBotones.add(btnRegistrar);
+        panelBotones.add(btnVerPagos);
+        panelForm.add(panelBotones, gbc);
+
+        add(panelForm, BorderLayout.NORTH);
+
+        // --- Tabla de pagos ---
+        tablaPagos = new JTable();
+        tablaPagos.setModel(new DefaultTableModel(
+                new Object[][]{},
+                new String[]{"ID Pago", "ID Obligación", "Fecha", "Medio", "Monto"}
+        ) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
             }
         });
+
+        JScrollPane scroll = new JScrollPane(tablaPagos);
+        add(scroll, BorderLayout.CENTER);
+
+        // --- Acciones de los botones ---
+        btnRegistrar.addActionListener(e -> registrarPago());
+        btnVerPagos.addActionListener(e -> listarPagosDeObligacion());
+    }
+
+    /**
+     * Registra un pago usando PagoService.
+     */
+    private void registrarPago() {
+        try {
+            int idObl = Integer.parseInt(txtIdObligacion.getText().trim());
+
+            LocalDate fecha;
+            String textoFecha = txtFecha.getText().trim();
+            if (textoFecha.isEmpty()) {
+                fecha = LocalDate.now(); // si no carga nada, uso hoy
+            } else {
+                try {
+                    fecha = LocalDate.parse(textoFecha, FORMATO_FECHA);
+                } catch (DateTimeParseException ex) {
+                    JOptionPane.showMessageDialog(
+                            this,
+                            "La fecha debe tener formato dd/MM/aaaa.",
+                            "Validación",
+                            JOptionPane.WARNING_MESSAGE
+                    );
+                    return;
+                }
+            }
+
+            String medio = (String) cmbMedio.getSelectedItem();
+
+            BigDecimal monto;
+            try {
+                monto = new BigDecimal(txtMonto.getText().trim());
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "El monto debe ser un número válido.",
+                        "Validación",
+                        JOptionPane.WARNING_MESSAGE
+                );
+                return;
+            }
+
+            pagoService.registrarPago(idObl, fecha, medio, monto);
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Pago registrado correctamente.",
+                    "Éxito",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            // Refresco la tabla de pagos de esa obligación
+            listarPagosDeObligacion();
+
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "El ID de la obligación debe ser un número entero.",
+                    "Validación",
+                    JOptionPane.WARNING_MESSAGE
+            );
+        } catch (DomainException | NotFoundException e) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    e.getMessage(),
+                    "Atención",
+                    JOptionPane.WARNING_MESSAGE
+            );
+        } catch (DataAccessException e) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Error al registrar el pago:\n" + e.getMessage(),
+                    "Error BD",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
+    }
+
+    /**
+     * Lista los pagos de la obligación indicada en txtIdObligacion.
+     */
+    private void listarPagosDeObligacion() {
+        try {
+            int idObl = Integer.parseInt(txtIdObligacion.getText().trim());
+            List<Pago> pagos = pagoService.listarPorObligacion(idObl);
+
+            DefaultTableModel model = (DefaultTableModel) tablaPagos.getModel();
+            model.setRowCount(0);
+
+            for (Pago p : pagos) {
+                model.addRow(new Object[]{
+                        p.getIdPago(),
+                        p.getObligacion() != null ? p.getObligacion().getIdObligacion() : idObl,
+                        p.getFecha(),
+                        p.getMedio(),
+                        p.getMonto()
+                });
+            }
+
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "El ID de la obligación debe ser un número entero.",
+                    "Validación",
+                    JOptionPane.WARNING_MESSAGE
+            );
+        } catch (NotFoundException e) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    e.getMessage(),
+                    "Atención",
+                    JOptionPane.WARNING_MESSAGE
+            );
+        } catch (DataAccessException e) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Error al listar pagos:\n" + e.getMessage(),
+                    "Error BD",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
     }
 }
 

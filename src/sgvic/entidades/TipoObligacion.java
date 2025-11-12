@@ -63,6 +63,7 @@ public class TipoObligacion {
     // === toString para depuración y menús ===
     @Override
     public String toString() {
-        return codigo + " - " + descripcion + " (" + periodicidad + ")";
-    }
+    return descripcion;   // o el campo que uses como nombre visible
+}
+
 }

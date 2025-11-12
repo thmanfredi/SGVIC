@@ -1,104 +1,184 @@
 package sgvic.ui;
 
-import sgvic.entidades.Alerta;
+import sgvic.entidades.Cliente;
+import sgvic.entidades.Obligacion;
+import sgvic.entidades.TipoObligacion;
 import sgvic.excepciones.DataAccessException;
-import sgvic.excepciones.DomainException;
-import sgvic.servicios.AlertaService;
+import sgvic.servicios.ObligacionService;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.time.LocalDate;
-import java.util.Deque;
+import java.time.temporal.ChronoUnit;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Panel de Alertas (Swing).
- * Integra la cola de alertas con una JTable.
+ * Panel de alertas de vencimientos.
+ *
+ * Genera alertas a partir de las obligaciones:
+ *  - Obligaciones vencidas.
+ *  - Obligaciones próximas a vencer (dentro de X días).
+ *
+ * No persiste alertas en BD, sino que las calcula en el momento
+ * a partir de los datos de obligaciones.
  */
 public class PanelAlertas extends JPanel {
 
-    private final AlertaService service = new AlertaService();
+    private final ObligacionService obligacionService = new ObligacionService();
 
-    private final DefaultTableModel modelo = new DefaultTableModel(
-            new String[]{"ID", "Fecha", "Leída"}, 0
-    );
-    private final JTable tabla = new JTable(modelo);
+    private JTable tablaAlertas;
+    private JButton btnGenerar;
+    private JButton btnLimpiar;
+
+    // Arreglo de días de aviso (ejemplo simple de uso de arreglos)
+    private static final int[] DIAS_AVISO = {0, 7, 15};
+
+    private final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     public PanelAlertas() {
-        setLayout(new BorderLayout());
-
-        JLabel lblTitulo = new JLabel("Alertas Pendientes", JLabel.CENTER);
-        lblTitulo.setFont(new Font("Segoe UI", Font.BOLD, 18));
-
-        JPanel acciones = new JPanel();
-        JButton btnGenerar = new JButton("Generar (vencidas / por vencer)");
-        JButton btnListar = new JButton("Listar pendientes");
-        JButton btnMarcar = new JButton("Marcar como leída (seleccionada)");
-        acciones.add(btnGenerar);
-        acciones.add(btnListar);
-        acciones.add(btnMarcar);
-
-        add(lblTitulo, BorderLayout.NORTH);
-        add(new JScrollPane(tabla), BorderLayout.CENTER);
-        add(acciones, BorderLayout.SOUTH);
-
-        // Generar nuevas alertas (hoy, con días de aviso)
-        btnGenerar.addActionListener(e -> {
-            String s = JOptionPane.showInputDialog(this, "Días de aviso (ej. 7):");
-            if (s == null || s.isBlank()) return;
-            try {
-                int dias = Integer.parseInt(s.trim());
-                Deque<Alerta> nuevas = service.generarPendientes(LocalDate.now(), dias);
-                JOptionPane.showMessageDialog(this, "Generadas " + nuevas.size() + " alertas nuevas.",
-                        "Resultado", JOptionPane.INFORMATION_MESSAGE);
-            } catch (NumberFormatException nfe) {
-                JOptionPane.showMessageDialog(this, "Ingrese un número válido.",
-                        "Validación", JOptionPane.WARNING_MESSAGE);
-            } catch (DataAccessException ex) {
-                JOptionPane.showMessageDialog(this, "Error al generar: " + ex.getMessage(),
-                        "Error", JOptionPane.ERROR_MESSAGE);
-            }
-        });
-
-        // Listar pendientes (Queue → JTable)
-        btnListar.addActionListener(e -> {
-            try {
-                cargarPendientes();
-            } catch (DataAccessException ex) {
-                JOptionPane.showMessageDialog(this, "Error al listar alertas: " + ex.getMessage(),
-                        "Error", JOptionPane.ERROR_MESSAGE);
-            }
-        });
-
-        // Marcar como leída la seleccionada
-        btnMarcar.addActionListener(e -> {
-            int row = tabla.getSelectedRow();
-            if (row < 0) {
-                JOptionPane.showMessageDialog(this, "Seleccione una alerta de la tabla.",
-                        "Validación", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-            int id = Integer.parseInt(modelo.getValueAt(row, 0).toString());
-            try {
-                service.marcarLeida(id);
-                cargarPendientes(); // refresco
-            } catch (DomainException | DataAccessException ex) {
-                JOptionPane.showMessageDialog(this, ex.getMessage(),
-                        "Error", JOptionPane.ERROR_MESSAGE);
-            }
-        });
+        initComponents();
     }
 
-    private void cargarPendientes() throws DataAccessException {
-        modelo.setRowCount(0);
-        Deque<Alerta> cola = service.listarPendientes();
-        for (Alerta a : cola) {
-            modelo.addRow(new Object[]{
-                    a.getIdAlerta(),
-                    a.getFecha(),
-                    a.isLeida() ? "Sí" : "No"
+    private void initComponents() {
+        setLayout(new BorderLayout(5, 5));
+
+        JPanel panelBotones = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        btnGenerar = new JButton("Generar alertas");
+        btnLimpiar = new JButton("Limpiar");
+
+        panelBotones.add(btnGenerar);
+        panelBotones.add(btnLimpiar);
+
+        add(panelBotones, BorderLayout.NORTH);
+
+        tablaAlertas = new JTable();
+        tablaAlertas.setModel(new DefaultTableModel(
+                new Object[][]{},
+                new String[]{
+                        "Cliente", "Tipo", "Período",
+                        "Fecha Venc.", "Días restantes", "Situación"
+                }
+        ) {
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
+        });
+
+        JScrollPane scroll = new JScrollPane(tablaAlertas);
+        add(scroll, BorderLayout.CENTER);
+
+        btnGenerar.addActionListener(e -> generarAlertas());
+        btnLimpiar.addActionListener(e -> limpiar());
+    }
+
+    /**
+     * Genera alertas a partir de las obligaciones,
+     * considerando las constantes DIAS_AVISO.
+     */
+    private void generarAlertas() {
+        try {
+            List<Obligacion> obligaciones = obligacionService.listar();
+            List<Obligacion> conAlerta = filtrarConAlerta(obligaciones);
+
+            cargarEnTabla(conAlerta);
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Se generaron " + conAlerta.size() + " alertas.",
+                    "Resultado",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+        } catch (DataAccessException e) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Error al generar alertas:\n" + e.getMessage(),
+                    "Error BD",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
+    }
+
+    /**
+     * Devuelve solo las obligaciones vencidas o próximas a vencer
+     * según los días configurados en DIAS_AVISO.
+     */
+    private List<Obligacion> filtrarConAlerta(List<Obligacion> origen) {
+        List<Obligacion> resultado = new ArrayList<>();
+        LocalDate hoy = LocalDate.now();
+
+        for (Obligacion o : origen) {
+            if (o.getFechaVenc() == null) continue;
+
+            long dias = ChronoUnit.DAYS.between(hoy, o.getFechaVenc());
+
+            boolean esVencida = dias < 0;
+            boolean esProxima = false;
+
+            if (!esVencida) {
+                for (int limite : DIAS_AVISO) {
+                    if (limite > 0 && dias <= limite) {
+                        esProxima = true;
+                        break;
+                    }
+                }
+            }
+
+            if (esVencida || esProxima) {
+                resultado.add(o);
+            }
+        }
+
+        return resultado;
+    }
+
+    private void cargarEnTabla(List<Obligacion> lista) {
+        DefaultTableModel model = (DefaultTableModel) tablaAlertas.getModel();
+        model.setRowCount(0);
+
+        LocalDate hoy = LocalDate.now();
+
+        for (Obligacion o : lista) {
+            Cliente c = o.getCliente();
+            TipoObligacion t = o.getTipo();
+
+            String cliente = c != null ? c.getRazonSocial() : "(sin cliente)";
+            String tipo = t != null ? t.getCodigo() : "(sin tipo)";
+            String periodo = o.getPeriodo();
+            String fechaVenc = o.getFechaVenc() != null ? o.getFechaVenc().format(FORMATO_FECHA) : "";
+
+            long dias = o.getFechaVenc() != null ? ChronoUnit.DAYS.between(hoy, o.getFechaVenc()) : 0;
+            String situacion;
+            if (dias < 0) {
+                situacion = "VENCIDA";
+            } else if (dias == 0) {
+                situacion = "Vence HOY";
+            } else if (dias <= 7) {
+                situacion = "Próxima a vencer";
+            } else if (dias <= 15) {
+                situacion = "Aviso temprano";
+            } else {
+                situacion = "En término";
+            }
+
+            model.addRow(new Object[]{
+                    cliente,
+                    tipo,
+                    periodo,
+                    fechaVenc,
+                    dias,
+                    situacion
             });
         }
+    }
+
+    private void limpiar() {
+        DefaultTableModel model = (DefaultTableModel) tablaAlertas.getModel();
+        model.setRowCount(0);
     }
 }
 

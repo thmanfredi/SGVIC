@@ -7,15 +7,6 @@ import java.time.LocalDate;
  * Clase abstracta que representa una obligación fiscal de un Cliente.
  * Mapea a la tabla 'obligacion' (idObligacion, idCliente, idTipo, periodo, fechaVenc, monto, estado).
  *
- * POO:
- * - Abstracción: esta clase define el "qué" común de cualquier obligación.
- * - Polimorfismo: subclases implementan calcularInteres(...) de forma distinta.
- * - Encapsulamiento: atributos privados + getters/setters.
- *
- * Reglas de dominio (alineadas con la BD):
- * - 'periodo' formato "AAAA-MM".
- * - 'monto' > 0.
- * - Unicidad (cliente, tipo, periodo) impuesta por la BD (uk_obl). Ver validación en Servicios.
  */
 public abstract class Obligacion {
 
@@ -84,7 +75,6 @@ public abstract class Obligacion {
 
     /**
      * Cálculo de interés/multa por mora.
-     * Polimórfico: cada tipo de obligación puede tener su propio cálculo.
      */
     public abstract BigDecimal calcularInteres(LocalDate hoy);
 }

@@ -57,6 +57,7 @@ public class ObligacionDAO implements Repositorio<Obligacion> {
                     ps.setBigDecimal(5, o.getMonto());
                     ps.setString(6, estadoToDb(o.getEstado()));
                     ps.executeUpdate();
+
                     try (ResultSet rs = ps.getGeneratedKeys()) {
                         if (rs.next()) o.setIdObligacion(rs.getInt(1));
                     }
@@ -178,4 +179,5 @@ public class ObligacionDAO implements Repositorio<Obligacion> {
         return EstadoObligacion.PENDIENTE;
     }
 }
+
 

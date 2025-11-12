@@ -2,7 +2,6 @@ package sgvic.dao;
 
 import sgvic.entidades.Cliente;
 import sgvic.excepciones.DataAccessException;
-import sgvic.excepciones.DomainException;
 import sgvic.config.DB;
 
 import java.sql.*;

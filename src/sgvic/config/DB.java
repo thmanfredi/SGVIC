@@ -1,34 +1,38 @@
 package sgvic.config;
 
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
 
-/**
- * Clase DB
- * Encargada de manejar la conexión a la base de datos MySQL.
- * Lee los datos desde el archivo db.properties ubicado en sgvic/config.
- */
 public class DB {
 
-    // Método que devuelve una conexión lista para usar
-    public static Connection getConnection() throws SQLException {
-        Properties props = new Properties();
+    private static final Properties props = new Properties();
 
-        try (FileInputStream fis = new FileInputStream("src/sgvic/config/db.properties")) {
-            props.load(fis);
-        } catch (IOException e) {
-            System.out.println("⚠️ No se pudo leer el archivo db.properties: " + e.getMessage());
+    static {
+        try {
+            // Cargar archivo db.properties desde el classpath (funciona dentro del .jar)
+            InputStream in = DB.class.getClassLoader().getResourceAsStream("sgvic/config/db.properties");
+            if (in == null) {
+                throw new RuntimeException("No se encontró el archivo db.properties en el classpath");
+            }
+            props.load(in);
+
+            // Cargar el driver de MySQL
+            Class.forName("com.mysql.cj.jdbc.Driver");
+
+        } catch (Exception e) {
+            throw new ExceptionInInitializerError("Error cargando configuración de BD: " + e);
         }
+    }
 
-        String url = props.getProperty("url");
-        String user = props.getProperty("user");
-        String password = props.getProperty("password");
-
-        // Intenta conectar
-        return DriverManager.getConnection(url, user, password);
+    public static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(
+                props.getProperty("url"),
+                props.getProperty("user"),
+                props.getProperty("password")
+        );
     }
 }
+

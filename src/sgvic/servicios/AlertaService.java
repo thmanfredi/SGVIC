@@ -16,7 +16,6 @@ import java.util.List;
 /**
  * Lógica de alertas:
  * - Generar alertas para obligaciones vencidas o que vencen en X días.
- * - Mantener una cola FIFO para procesar "pendientes".
  */
 public class AlertaService {
 

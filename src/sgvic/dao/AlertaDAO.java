@@ -11,9 +11,6 @@ import java.util.List;
 
 /**
  * Acceso a datos para 'alerta' (idAlerta, idObligacion, fecha, leida).
- * Notas:
- * - Mantenemos el objeto Obligacion como null en el mapeo (no siempre lo necesitamos).
- *   Si hace falta, la UI o el Service pueden buscar detalles por el idObligacion.
  */
 public class AlertaDAO {
 
@@ -54,7 +51,6 @@ public class AlertaDAO {
             while (rs.next()) {
                 Alerta a = new Alerta();
                 a.setIdAlerta(rs.getInt("idAlerta"));
-                // Dejamos obligacion en null (la UI puede mostrar el id si lo necesita)
                 a.setObligacion(null);
                 a.setFecha(rs.getDate("fecha").toLocalDate());
                 a.setLeida(rs.getBoolean("leida"));

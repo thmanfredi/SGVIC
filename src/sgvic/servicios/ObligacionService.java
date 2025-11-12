@@ -1,100 +1,126 @@
 package sgvic.servicios;
 
 import sgvic.dao.ObligacionDAO;
-import sgvic.entidades.*;
+import sgvic.entidades.Cliente;
+import sgvic.entidades.EstadoObligacion;
+import sgvic.entidades.Obligacion;
+import sgvic.entidades.ObligacionMensual;
+import sgvic.entidades.TipoObligacion;
 import sgvic.excepciones.DataAccessException;
 import sgvic.excepciones.DomainException;
-import sgvic.excepciones.NotFoundException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+/**
+ * Servicio de obligaciones fiscales.
+ * Acá se concentra la lógica de negocio:
+ *  - Listar obligaciones desde la BD.
+ *  - Ordenarlas por fecha de vencimiento.
+ *  - Buscar una obligación por período usando búsqueda binaria.
+ *  - Crear nuevas obligaciones y guardarlas en la BD.
+ */
 public class ObligacionService {
 
-    private final ObligacionDAO dao = new ObligacionDAO();
+    private final ObligacionDAO obligacionDAO;
 
-    // --- Validaciones básicas ---
-    private void validarObligacion(Obligacion o) throws DomainException {
-        if (o == null) throw new DomainException("Obligación inválida (null).");
-        if (o.getCliente() == null || o.getCliente().getIdCliente() <= 0)
-            throw new DomainException("Cliente inválido para la obligación.");
-        if (o.getTipo() == null || o.getTipo().getIdTipo() <= 0)
-            throw new DomainException("Tipo de obligación inválido.");
-        if (o.getPeriodo() == null || !o.getPeriodo().matches("\\d{4}-\\d{2}"))
-            throw new DomainException("Período inválido. Formato esperado AAAA-MM.");
-        if (o.getFechaVenc() == null)
-            throw new DomainException("La fecha de vencimiento es obligatoria.");
-        if (o.getMonto() == null || o.getMonto().compareTo(BigDecimal.ZERO) <= 0)
-            throw new DomainException("El monto debe ser mayor a 0.");
-        if (o.getEstado() == null)
-            throw new DomainException("El estado es obligatorio.");
+    public ObligacionService() {
+        this.obligacionDAO = new ObligacionDAO();
     }
 
-    // --- API pública ---
-    public void alta(Obligacion o) throws DomainException, DataAccessException {
-        validarObligacion(o);
-        // Dejar que la BD haga cumplir la UK (idCliente,idTipo,periodo) y capturar mensaje amable en DAO.
-        dao.guardar(o);
-    }
-
-    public void actualizar(Obligacion o) throws DomainException, DataAccessException {
-        if (o.getIdObligacion() <= 0) throw new DomainException("ID inválido para actualizar.");
-        validarObligacion(o);
-        dao.guardar(o);
-    }
-
-    public Obligacion buscarPorId(int id) throws DataAccessException, NotFoundException {
-        Obligacion o = dao.buscarPorId(id);
-        if (o == null) throw new NotFoundException("Obligación no encontrada.");
-        return o;
-    }
-
+    /**
+     * Devuelve todas las obligaciones de la BD.
+     */
     public List<Obligacion> listar() throws DataAccessException {
-        return dao.listar();
+        return obligacionDAO.listar();
     }
 
-    public List<Obligacion> listarPorCliente(int idCliente) throws DataAccessException {
-        return dao.listarPorCliente(idCliente);
+    /**
+     * Devuelve una NUEVA lista ordenada por fecha de vencimiento (ascendente).
+     * No modifica la lista original.
+     */
+    public List<Obligacion> ordenarPorVencimiento(List<Obligacion> origen) {
+        List<Obligacion> copia = new ArrayList<>(origen);
+        copia.sort(Comparator.comparing(Obligacion::getFechaVenc));
+        return copia;
     }
 
-    public void eliminar(int idObligacion) throws DataAccessException, DomainException {
-        if (idObligacion <= 0) throw new DomainException("ID inválido para eliminar.");
-        dao.eliminar(idObligacion);
-    }
+    /**
+     * Búsqueda binaria por período (ej: "2025-03").
+     * Trabaja sobre una copia de la lista, ordenada por período.
+     * Si no encuentra el período, devuelve null.
+     */
+    public Obligacion buscarPorPeriodo(List<Obligacion> origen, String periodoBuscado) {
+        if (origen == null || origen.isEmpty()) return null;
+        if (periodoBuscado == null || periodoBuscado.isBlank()) return null;
 
-    // --- Ordenación por fecha de vencimiento (ascendente) ---
-    public void ordenarPorVencimiento(List<Obligacion> lista) {
-        if (lista == null) return;
-        lista.sort(Comparator.comparing(Obligacion::getFechaVenc));
-    }
+        String clave = periodoBuscado.trim();
 
-    // --- Búsqueda binaria por PERÍODO (sobre lista ORDENADA por PERÍODO) ---
-    public int ordenarPorPeriodoYBuscarBinario(List<Obligacion> lista, String periodo) {
-        if (lista == null || periodo == null) return -1;
-        // 1) Ordenamos por período (String AAAA-MM funciona lexicográficamente)
-        lista.sort(Comparator.comparing(Obligacion::getPeriodo));
-        // 2) Búsqueda binaria clásica
-        int lo = 0, hi = lista.size() - 1;
-        while (lo <= hi) {
-            int mid = (lo + hi) >>> 1;
-            String p = lista.get(mid).getPeriodo();
-            int cmp = p.compareTo(periodo);
-            if (cmp == 0) return mid;
-            if (cmp < 0) lo = mid + 1;
-            else hi = mid - 1;
+        // Hago una copia y la ordeno por período (String "AAAA-MM")
+        List<Obligacion> copia = new ArrayList<>(origen);
+        copia.sort(Comparator.comparing(Obligacion::getPeriodo));
+
+        int low = 0;
+        int high = copia.size() - 1;
+
+        while (low <= high) {
+            int mid = (low + high) / 2;
+            Obligacion current = copia.get(mid);
+            int cmp = current.getPeriodo().compareTo(clave);
+
+            if (cmp == 0) {
+                return current; // encontrada
+            } else if (cmp < 0) {
+                low = mid + 1;  // buscar en mitad superior
+            } else {
+                high = mid - 1; // buscar en mitad inferior
+            }
         }
-        return -1;
+        return null; // no encontrada
     }
 
-    // --- Marcar pagada (se completará con PagoService luego) ---
-    public void marcarPagada(Obligacion o) throws DomainException, DataAccessException {
-        if (o == null || o.getIdObligacion() <= 0)
-            throw new DomainException("Obligación inválida para marcar como pagada.");
-        o.marcarPagada();
-        dao.guardar(o);
+    /**
+     * Crea una nueva obligación y la persiste en la BD.
+     * Valida los datos de entrada y, si son correctos,
+     * instancia una ObligacionMensual (o la clase concreta que uses)
+     * en estado PENDIENTE y la guarda con el DAO.
+     */
+    public void crearObligacion(Cliente cliente,
+                                TipoObligacion tipo,
+                                String periodo,
+                                LocalDate fechaVenc,
+                                BigDecimal monto) throws DomainException, DataAccessException {
+
+        if (cliente == null) {
+            throw new DomainException("Debe seleccionar un cliente.");
+        }
+        if (tipo == null) {
+            throw new DomainException("Debe seleccionar un tipo de obligación.");
+        }
+        if (periodo == null || !periodo.matches("\\d{4}-\\d{2}")) {
+            throw new DomainException("El período debe tener formato AAAA-MM.");
+        }
+        if (fechaVenc == null) {
+            throw new DomainException("Debe ingresar una fecha de vencimiento válida.");
+        }
+        if (monto == null || monto.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new DomainException("El monto debe ser mayor a cero.");
+        }
+
+        // Uso ObligacionMensual como implementación concreta.
+        // Si en algún caso querés anual, podés decidirlo según la periodicidad del tipo.
+        Obligacion nueva = new ObligacionMensual(
+                cliente,
+                tipo,
+                periodo,
+                fechaVenc,
+                monto,
+                EstadoObligacion.PENDIENTE
+        );
+
+        obligacionDAO.guardar(nueva);
     }
 }
-

@@ -6,14 +6,10 @@ import java.util.Objects;
  * Representa un cliente del estudio.
  * Mapea a la tabla 'cliente' (idCliente, razon_social, cuit, email, telefono, direccion).
  *
- * Nota de dominio:
- * - El CUIT debe ser único (la BD ya lo impone con UNIQUE en 'cliente.cuit').
- * - Acá dejamos una validación básica de formato para acompañar esa regla.
  */
 public class Cliente {
 
-    // === Atributos (encapsulados) ===
-    // Usamos nombres Java-friendly; si preferís 1:1 con las columnas, podés llamarlo idCliente/razonSocial, etc.
+    // === Atributos (encapsulados) ==
     private int idCliente;         // PK en BD
     private String razonSocial;    // NOT NULL
     private String cuit;           // UNIQUE en BD
@@ -65,15 +61,11 @@ public class Cliente {
     public void setDireccion(String direccion) { this.direccion = direccion; }
 
     // === Validaciones livianas de dominio (se reforzarán en Service) ===
-
-    /** Valida formato muy básico de CUIT: 11 dígitos. (La unicidad la asegura la BD) */
     public static boolean validarCuitBasico(String cuit) {
         return cuit != null && cuit.matches("\\d{11}");
     }
 
-    /** Ejemplo de preparación para validaciones más fuertes (DV): placeholder. */
     public static boolean validarCuitConDV(String cuit) {
-        // Si más adelante querés sumar puntos, acá podés implementar el dígito verificador.
         return validarCuitBasico(cuit);
     }
 
@@ -99,12 +91,11 @@ public class Cliente {
 
     @Override
     public String toString() {
-        return "Cliente{id=" + idCliente +
-                ", razonSocial='" + razonSocial + '\'' +
-                ", cuit='" + cuit + '\'' +
-                ", email='" + email + '\'' +
-                ", telefono='" + telefono + '\'' +
-                ", direccion='" + direccion + '\'' +
-                '}';
-    }
+    // Lo que se verá en los JComboBox, tablas, etc.
+    return razonSocial;   // o getRazonSocial();
+}
+
+    
+    
+
 }
