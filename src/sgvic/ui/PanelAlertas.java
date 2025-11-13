@@ -8,6 +8,7 @@ import sgvic.servicios.ObligacionService;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableColumnModel;
 import java.awt.*;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -18,12 +19,14 @@ import java.util.List;
 /**
  * Panel de alertas de vencimientos.
  *
- * Genera alertas a partir de las obligaciones:
- *  - Obligaciones vencidas.
- *  - Obligaciones próximas a vencer (dentro de X días).
+ * Muestra:
+ *  - Obligaciones vencidas
+ *  - Obligaciones próximas a vencer (0, 7 y 15 días)
  *
- * No persiste alertas en BD, sino que las calcula en el momento
- * a partir de los datos de obligaciones.
+ * Incluye:
+ *  - Generar alertas
+ *  - Limpiar
+ *  - Marcar como leída (quita la fila seleccionada)
  */
 public class PanelAlertas extends JPanel {
 
@@ -32,8 +35,9 @@ public class PanelAlertas extends JPanel {
     private JTable tablaAlertas;
     private JButton btnGenerar;
     private JButton btnLimpiar;
+    private JButton btnMarcarLeida;
 
-    // Arreglo de días de aviso (ejemplo simple de uso de arreglos)
+    // Configuración de días de aviso
     private static final int[] DIAS_AVISO = {0, 7, 15};
 
     private final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -48,9 +52,11 @@ public class PanelAlertas extends JPanel {
         JPanel panelBotones = new JPanel(new FlowLayout(FlowLayout.LEFT));
         btnGenerar = new JButton("Generar alertas");
         btnLimpiar = new JButton("Limpiar");
+        btnMarcarLeida = new JButton("Marcar como leída");
 
         panelBotones.add(btnGenerar);
         panelBotones.add(btnLimpiar);
+        panelBotones.add(btnMarcarLeida);
 
         add(panelBotones, BorderLayout.NORTH);
 
@@ -68,35 +74,32 @@ public class PanelAlertas extends JPanel {
             }
         });
 
-        configurarAnchosColumnasAlertas();
+        tablaAlertas.setRowHeight(22);
 
         JScrollPane scroll = new JScrollPane(tablaAlertas);
         add(scroll, BorderLayout.CENTER);
 
         btnGenerar.addActionListener(e -> generarAlertas());
         btnLimpiar.addActionListener(e -> limpiar());
-    }
-
-    private void configurarAnchosColumnasAlertas() {
-        tablaAlertas.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-
-        // Cliente
-        tablaAlertas.getColumnModel().getColumn(0).setPreferredWidth(220);
-        // Tipo
-        tablaAlertas.getColumnModel().getColumn(1).setPreferredWidth(140);
-        // Período
-        tablaAlertas.getColumnModel().getColumn(2).setPreferredWidth(90);
-        // Fecha Venc.
-        tablaAlertas.getColumnModel().getColumn(3).setPreferredWidth(110);
-        // Días restantes
-        tablaAlertas.getColumnModel().getColumn(4).setPreferredWidth(110);
-        // Situación
-        tablaAlertas.getColumnModel().getColumn(5).setPreferredWidth(130);
+        btnMarcarLeida.addActionListener(e -> marcarComoLeida());
     }
 
     /**
-     * Genera alertas a partir de las obligaciones,
-     * considerando las constantes DIAS_AVISO.
+     * Ajusta los anchos de las columnas para que el nombre del cliente
+     * y tipo se vean completos.
+     */
+    private void ajustarColumnas() {
+        TableColumnModel col = tablaAlertas.getColumnModel();
+        col.getColumn(0).setPreferredWidth(170);  // Cliente
+        col.getColumn(1).setPreferredWidth(110);  // Tipo obligacion
+        col.getColumn(2).setPreferredWidth(80);   // Periodo
+        col.getColumn(3).setPreferredWidth(90);   // Fecha venc
+        col.getColumn(4).setPreferredWidth(90);   // Días restantes
+        col.getColumn(5).setPreferredWidth(130);  // Situación
+    }
+
+    /**
+     * Genera alertas a partir de las obligaciones en BD.
      */
     private void generarAlertas() {
         try {
@@ -123,8 +126,7 @@ public class PanelAlertas extends JPanel {
     }
 
     /**
-     * Devuelve solo las obligaciones vencidas o próximas a vencer
-     * según los días configurados en DIAS_AVISO.
+     * Devuelve obligaciones vencidas o próximas a vencer.
      */
     private List<Obligacion> filtrarConAlerta(List<Obligacion> origen) {
         List<Obligacion> resultado = new ArrayList<>();
@@ -136,16 +138,9 @@ public class PanelAlertas extends JPanel {
             long dias = ChronoUnit.DAYS.between(hoy, o.getFechaVenc());
 
             boolean esVencida = dias < 0;
-            boolean esProxima = false;
-
-            if (!esVencida) {
-                for (int limite : DIAS_AVISO) {
-                    if (limite > 0 && dias <= limite) {
-                        esProxima = true;
-                        break;
-                    }
-                }
-            }
+            boolean esProxima = dias >= 0 && (
+                    dias <= DIAS_AVISO[1] || dias <= DIAS_AVISO[2]
+            );
 
             if (esVencida || esProxima) {
                 resultado.add(o);
@@ -155,6 +150,9 @@ public class PanelAlertas extends JPanel {
         return resultado;
     }
 
+    /**
+     * Carga datos en tabla con formateos.
+     */
     private void cargarEnTabla(List<Obligacion> lista) {
         DefaultTableModel model = (DefaultTableModel) tablaAlertas.getModel();
         model.setRowCount(0);
@@ -168,40 +166,55 @@ public class PanelAlertas extends JPanel {
             String cliente = c != null ? c.getRazonSocial() : "(sin cliente)";
             String tipo = t != null ? t.getCodigo() : "(sin tipo)";
             String periodo = o.getPeriodo();
-            String fechaVenc = o.getFechaVenc() != null ? o.getFechaVenc().format(FORMATO_FECHA) : "";
+            String fechaVenc = o.getFechaVenc() != null
+                    ? o.getFechaVenc().format(FORMATO_FECHA)
+                    : "";
 
             long dias = o.getFechaVenc() != null ? ChronoUnit.DAYS.between(hoy, o.getFechaVenc()) : 0;
+
             String situacion;
-            if (dias < 0) {
-                situacion = "VENCIDA";
-            } else if (dias == 0) {
-                situacion = "Vence HOY";
-            } else if (dias <= 7) {
-                situacion = "Próxima a vencer";
-            } else if (dias <= 15) {
-                situacion = "Aviso temprano";
-            } else {
-                situacion = "En término";
-            }
+            if (dias < 0) situacion = "VENCIDA";
+            else if (dias == 0) situacion = "Vence HOY";
+            else if (dias <= 7) situacion = "Próxima a vencer";
+            else if (dias <= 15) situacion = "Aviso temprano";
+            else situacion = "En término";
 
             model.addRow(new Object[]{
-                    cliente,
-                    tipo,
-                    periodo,
-                    fechaVenc,
-                    dias,
-                    situacion
+                    cliente, tipo, periodo, fechaVenc, dias, situacion
             });
         }
 
-        configurarAnchosColumnasAlertas();
+        ajustarColumnas();
     }
 
+    /**
+     * Limpia la tabla.
+     */
     private void limpiar() {
         DefaultTableModel model = (DefaultTableModel) tablaAlertas.getModel();
         model.setRowCount(0);
     }
+
+    /**
+     * Elimina la alerta seleccionada.
+     */
+    private void marcarComoLeida() {
+        int fila = tablaAlertas.getSelectedRow();
+        if (fila < 0) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Seleccione una alerta para marcarla como leída.",
+                    "Aviso",
+                    JOptionPane.WARNING_MESSAGE
+            );
+            return;
+        }
+
+        ((DefaultTableModel) tablaAlertas.getModel()).removeRow(fila);
+    }
 }
+
+
 
 
 
