@@ -68,11 +68,30 @@ public class PanelAlertas extends JPanel {
             }
         });
 
+        configurarAnchosColumnasAlertas();
+
         JScrollPane scroll = new JScrollPane(tablaAlertas);
         add(scroll, BorderLayout.CENTER);
 
         btnGenerar.addActionListener(e -> generarAlertas());
         btnLimpiar.addActionListener(e -> limpiar());
+    }
+
+    private void configurarAnchosColumnasAlertas() {
+        tablaAlertas.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+
+        // Cliente
+        tablaAlertas.getColumnModel().getColumn(0).setPreferredWidth(220);
+        // Tipo
+        tablaAlertas.getColumnModel().getColumn(1).setPreferredWidth(140);
+        // Período
+        tablaAlertas.getColumnModel().getColumn(2).setPreferredWidth(90);
+        // Fecha Venc.
+        tablaAlertas.getColumnModel().getColumn(3).setPreferredWidth(110);
+        // Días restantes
+        tablaAlertas.getColumnModel().getColumn(4).setPreferredWidth(110);
+        // Situación
+        tablaAlertas.getColumnModel().getColumn(5).setPreferredWidth(130);
     }
 
     /**
@@ -174,6 +193,8 @@ public class PanelAlertas extends JPanel {
                     situacion
             });
         }
+
+        configurarAnchosColumnasAlertas();
     }
 
     private void limpiar() {
@@ -181,6 +202,7 @@ public class PanelAlertas extends JPanel {
         model.setRowCount(0);
     }
 }
+
 
 
 

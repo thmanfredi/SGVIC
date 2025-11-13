@@ -109,7 +109,9 @@ public class PanelPagos extends JPanel {
         tablaPagos = new JTable();
         tablaPagos.setModel(new DefaultTableModel(
                 new Object[][]{},
-                new String[]{"ID Pago", "ID Obligación", "Fecha", "Medio", "Monto"}
+                new String[]{
+                        "ID Pago", "ID Obligación", "Cliente", "Período", "Fecha", "Medio", "Monto"
+                }
         ) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -117,12 +119,33 @@ public class PanelPagos extends JPanel {
             }
         });
 
+        configurarAnchosColumnasPagos();
+
         JScrollPane scroll = new JScrollPane(tablaPagos);
         add(scroll, BorderLayout.CENTER);
 
         // --- Acciones de los botones ---
         btnRegistrar.addActionListener(e -> registrarPago());
         btnVerPagos.addActionListener(e -> listarPagosDeObligacion());
+    }
+
+    private void configurarAnchosColumnasPagos() {
+        tablaPagos.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+
+        // ID Pago
+        tablaPagos.getColumnModel().getColumn(0).setPreferredWidth(70);
+        // ID Obligación
+        tablaPagos.getColumnModel().getColumn(1).setPreferredWidth(90);
+        // Cliente
+        tablaPagos.getColumnModel().getColumn(2).setPreferredWidth(220);
+        // Período
+        tablaPagos.getColumnModel().getColumn(3).setPreferredWidth(90);
+        // Fecha
+        tablaPagos.getColumnModel().getColumn(4).setPreferredWidth(100);
+        // Medio
+        tablaPagos.getColumnModel().getColumn(5).setPreferredWidth(180);
+        // Monto
+        tablaPagos.getColumnModel().getColumn(6).setPreferredWidth(100);
     }
 
     /**
@@ -213,14 +236,33 @@ public class PanelPagos extends JPanel {
             model.setRowCount(0);
 
             for (Pago p : pagos) {
+                // Datos adicionales desde la obligación asociada
+                String cliente = "";
+                String periodo = "";
+                if (p.getObligacion() != null) {
+                    periodo = p.getObligacion().getPeriodo();
+                    if (p.getObligacion().getCliente() != null) {
+                        cliente = p.getObligacion().getCliente().getRazonSocial();
+                    }
+                }
+
+                String fechaStr = "";
+                if (p.getFecha() != null) {
+                    fechaStr = p.getFecha().format(FORMATO_FECHA);
+                }
+
                 model.addRow(new Object[]{
                         p.getIdPago(),
                         p.getObligacion() != null ? p.getObligacion().getIdObligacion() : idObl,
-                        p.getFecha(),
+                        cliente,
+                        periodo,
+                        fechaStr,
                         p.getMedio(),
                         p.getMonto()
                 });
             }
+
+            configurarAnchosColumnasPagos();
 
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(

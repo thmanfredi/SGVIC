@@ -99,6 +99,8 @@ public class PanelObligaciones extends JPanel {
             }
         });
 
+        configurarAnchosColumnas();
+
         JScrollPane scroll = new JScrollPane(tablaObligaciones);
         add(scroll, BorderLayout.CENTER);
 
@@ -107,6 +109,28 @@ public class PanelObligaciones extends JPanel {
         btnOrdenar.addActionListener(e -> ordenarPorVencimiento());
         btnBuscar.addActionListener(e -> buscarPorPeriodo());
         btnAgregar.addActionListener(e -> agregarObligacion());
+    }
+
+    /**
+     * Ajusta los anchos de las columnas de la tabla de obligaciones.
+     */
+    private void configurarAnchosColumnas() {
+        tablaObligaciones.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+
+        // ID
+        tablaObligaciones.getColumnModel().getColumn(0).setPreferredWidth(40);
+        // Cliente
+        tablaObligaciones.getColumnModel().getColumn(1).setPreferredWidth(220);
+        // Tipo
+        tablaObligaciones.getColumnModel().getColumn(2).setPreferredWidth(140);
+        // Período
+        tablaObligaciones.getColumnModel().getColumn(3).setPreferredWidth(90);
+        // Vencimiento
+        tablaObligaciones.getColumnModel().getColumn(4).setPreferredWidth(110);
+        // Estado
+        tablaObligaciones.getColumnModel().getColumn(5).setPreferredWidth(100);
+        // Monto
+        tablaObligaciones.getColumnModel().getColumn(6).setPreferredWidth(110);
     }
 
     /**
@@ -228,7 +252,6 @@ public class PanelObligaciones extends JPanel {
             List<Cliente> clientes = clienteService.listar();
             List<TipoObligacion> tipos = tipoObligacionService.listarTodos();
 
-
             if (clientes.isEmpty() || tipos.isEmpty()) {
                 JOptionPane.showMessageDialog(this,
                         "Debe haber al menos un cliente y un tipo de obligación cargados.",
@@ -244,20 +267,19 @@ public class PanelObligaciones extends JPanel {
             JTextField txtMonto = new JTextField(10);
 
             JPanel panel = new JPanel(new GridLayout(0, 2, 5, 5));
-panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-panel.setPreferredSize(new java.awt.Dimension(450, 180));
+            panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+            panel.setPreferredSize(new java.awt.Dimension(450, 180));
 
-panel.add(new JLabel("Cliente:"));
-panel.add(cmbClientes);
-panel.add(new JLabel("Tipo obligación:"));
-panel.add(cmbTipos);
-panel.add(new JLabel("Período (AAAA-MM):"));
-panel.add(txtPeriodo);
-panel.add(new JLabel("Fecha venc. (dd/MM/aaaa):"));
-panel.add(txtFechaVenc);
-panel.add(new JLabel("Monto:"));
-panel.add(txtMonto);
-
+            panel.add(new JLabel("Cliente:"));
+            panel.add(cmbClientes);
+            panel.add(new JLabel("Tipo obligación:"));
+            panel.add(cmbTipos);
+            panel.add(new JLabel("Período (AAAA-MM):"));
+            panel.add(txtPeriodo);
+            panel.add(new JLabel("Fecha venc. (dd/MM/aaaa):"));
+            panel.add(txtFechaVenc);
+            panel.add(new JLabel("Monto:"));
+            panel.add(txtMonto);
 
             int result = JOptionPane.showConfirmDialog(this, panel,
                     "Nueva obligación", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
@@ -324,5 +346,8 @@ panel.add(txtMonto);
                     monto
             });
         }
+
+        configurarAnchosColumnas();
     }
 }
+

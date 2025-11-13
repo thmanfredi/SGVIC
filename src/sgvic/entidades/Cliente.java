@@ -70,7 +70,7 @@ public class Cliente {
     }
 
     // === equals/hashCode/toString ===
-    // Criterio: si el id ya existe (>0), usamos id; si no, usamos CUIT (caso objetos nuevos aún no persistidos).
+    // Criterio: si el id ya existe (>0), usamos id; si no, usamos CUIT.
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
