@@ -90,7 +90,7 @@ Conexión por `db.properties`:
 3. Ejecutar **MainFrame.java**
 
 ### Desde terminal (JAR)
-```bash
+bash
 cd dist
 java -jar SGVIC_Java.jar
 
