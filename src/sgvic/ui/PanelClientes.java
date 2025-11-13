@@ -64,12 +64,37 @@ public class PanelClientes extends JPanel {
             }
         });
 
+        // Ajuste de anchos de columna para que se vea bien el texto largo
+        configurarAnchosColumnas();
+
         JScrollPane scroll = new JScrollPane(tablaClientes);
         add(scroll, BorderLayout.CENTER);
 
         // --- Asignar acciones a los botones ---
         btnListar.addActionListener(e -> cargarClientesEnTabla());
         btnAgregar.addActionListener(e -> agregarCliente());
+    }
+
+    /**
+     * Ajusta los anchos de las columnas de la tabla de clientes.
+     * De esta forma se ve completa la razón social, email y dirección.
+     */
+    private void configurarAnchosColumnas() {
+        // Desactivo el auto-resize para que respete los anchos que le doy
+        tablaClientes.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+
+        // ID
+        tablaClientes.getColumnModel().getColumn(0).setPreferredWidth(40);
+        // Razón Social
+        tablaClientes.getColumnModel().getColumn(1).setPreferredWidth(200);
+        // CUIT
+        tablaClientes.getColumnModel().getColumn(2).setPreferredWidth(120);
+        // Email
+        tablaClientes.getColumnModel().getColumn(3).setPreferredWidth(200);
+        // Teléfono
+        tablaClientes.getColumnModel().getColumn(4).setPreferredWidth(120);
+        // Dirección
+        tablaClientes.getColumnModel().getColumn(5).setPreferredWidth(200);
     }
 
     /**
@@ -93,6 +118,9 @@ public class PanelClientes extends JPanel {
                         c.getDireccion()
                 });
             }
+
+            // Por si en algún momento se cambiara el modelo, vuelvo a asegurar los anchos
+            configurarAnchosColumnas();
 
         } catch (DataAccessException e) {
             JOptionPane.showMessageDialog(
@@ -175,5 +203,6 @@ public class PanelClientes extends JPanel {
         }
     }
 }
+
 
 

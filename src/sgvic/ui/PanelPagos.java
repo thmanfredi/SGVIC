@@ -36,10 +36,10 @@ public class PanelPagos extends JPanel {
 
     // Arreglo de medios de pago (cumple con el uso de arreglos + ArrayList)
     private static final String[] MEDIOS_PAGO = {
-            "Transferencia",
-            "Efectivo",
+            "VEP - Volante electronico de pago",
+            "Plan de Pago",
             "Tarjeta",
-            "Cheque"
+            "Efectivo"
     };
 
     private final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
